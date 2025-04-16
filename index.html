@@ -1,42 +1,39 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Foam Modulus Tool</title>
+  <meta charset="UTF-8">
+  <title>Elastic Modulus Viewer</title>
   <link rel="stylesheet" href="style.css" />
-  <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+  <script src="https://cdn.plot.ly/plotly-2.26.0.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
   <script src="https://cdn.jsdelivr.net/pyodide/v0.23.4/full/pyodide.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjs/11.8.0/math.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/mathjs@11.8.2/lib/browser/math.min.js"></script>
 </head>
 <body>
-  <h1>Foam-Like Modulus Calculator</h1>
-
-  <div>
-    <input type="file" id="csvFile" accept=".csv" />
-    <label>Min Strain: <input id="strainMin" type="number" step="0.0001" value="0.001" /></label>
-    <label>Max Strain: <input id="strainMax" type="number" step="0.0001" value="0.01" /></label>
-    <button onclick="runAnalysis()">Calculate Modulus</button>
+  <div id="controls">
+    <input type="file" id="fileInput" multiple>
+    <button onclick="runAnalysis()">Run Analysis</button>
+    <label><input type="checkbox" id="toggleSmooth" checked> Show Smoothed Curves</label>
+    <label>Min Strain: <input type="number" step="any" id="minStrain" value="0.001"></label>
+    <label>Max Strain: <input type="number" step="any" id="maxStrain" value="0.01"></label>
+    <label>Window: <input type="number" step="1" id="smoothWindow" value="11"></label>
+    <label>Poly Order: <input type="number" step="1" id="polyOrder" value="2"></label>
   </div>
 
-  <div id="modulusDisplay" style="margin-top: 10px; font-weight: bold;"></div>
+  <div id="main">
+    <div id="plot"></div>
+    <div id="dataPreview">
+      <h4>CSV Preview</h4>
+      <table id="dataPreviewTable">
+        <thead><tr><th>Strain</th><th>Stress</th></tr></thead>
+        <tbody id="dataBody"></tbody>
+      </table>
+    </div>
+  </div>
 
-  <div id="plot" style="width:100%; height:500px;"></div>
-
-  <h3>Assign to Group</h3>
-  <select id="groupSelector">
-    <option value="Control">Control</option>
-    <option value="Treated">Treated</option>
-  </select>
-  <button onclick="assignToGroup()">Assign</button>
-
-  <h3>Group Summary</h3>
-  <div id="groupPlot" style="width:100%; height:400px;"></div>
-
-  <h3>Save/Load Session</h3>
-  <button onclick="saveSession()">Save JSON</button>
-  <input type="file" id="loadSessionFile" accept=".json" />
-
-  <script type="module" src="app.js"></script>
+  <div id="modulusSummary"></div>
+  <pre id="debug"></pre>
+  <script src="app.js"></script>
 </body>
 </html>

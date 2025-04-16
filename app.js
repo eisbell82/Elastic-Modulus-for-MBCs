@@ -136,9 +136,11 @@ async function runAnalysis() {
     csv_texts.push(text);
   }
 
-  const result = await pyodide.runPythonAsync(\`
-    process_csv_all(\${JSON.stringify(csv_texts)}, \${minStrain}, \${maxStrain})
-  \`);
+  const encoded = JSON.stringify(csv_texts);
+  const result = await pyodide.runPythonAsync(`
+    process_csv_all(${encoded}, ${minStrain}, ${maxStrain})
+  `);
+
 
   const data = result.toJs();
   currentModulus = data.modulus;

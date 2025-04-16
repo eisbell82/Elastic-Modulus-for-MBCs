@@ -1,39 +1,45 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <title>Elastic Modulus Viewer</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Foam Modulus Tool</title>
   <link rel="stylesheet" href="style.css" />
-  <script src="https://cdn.plot.ly/plotly-2.26.0.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+  <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
   <script src="https://cdn.jsdelivr.net/pyodide/v0.23.4/full/pyodide.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/mathjs@11.8.2/lib/browser/math.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjs/11.8.0/math.min.js"></script>
 </head>
 <body>
-  <div id="controls">
-    <input type="file" id="fileInput" multiple>
-    <button onclick="runAnalysis()">Run Analysis</button>
-    <label><input type="checkbox" id="toggleSmooth" checked> Show Smoothed Curves</label>
-    <label>Min Strain: <input type="number" step="any" id="minStrain" value="0.001"></label>
-    <label>Max Strain: <input type="number" step="any" id="maxStrain" value="0.01"></label>
-    <label>Window: <input type="number" step="1" id="smoothWindow" value="11"></label>
-    <label>Poly Order: <input type="number" step="1" id="polyOrder" value="2"></label>
+  <h1>Foam-Like Modulus Tool (Ported)</h1>
+
+  <div>
+    <input type="file" id="csvFile" accept=".csv" multiple />
+    <label>Min Strain: <input id="strainMin" type="number" step="0.0001" value="0.001" /></label>
+    <label>Max Strain: <input id="strainMax" type="number" step="0.0001" value="0.01" /></label>
+    <label>Smoothing Window: <input id="smoothingWindow" type="number" step="2" value="11" min="3" /></label>
+    <label>Poly Order: <input id="polyOrder" type="number" step="1" value="2" min="1" /></label>
+    <button onclick="runAnalysis()">Calculate Modulus</button>
   </div>
 
-  <div id="main">
-    <div id="plot"></div>
-    <div id="dataPreview">
-      <h4>CSV Preview</h4>
-      <table id="dataPreviewTable">
-        <thead><tr><th>Strain</th><th>Stress</th></tr></thead>
-        <tbody id="dataBody"></tbody>
-      </table>
-    </div>
+  <div id="modulusDisplay" style="margin-top: 10px; font-weight: bold;"></div>
+  <div style="display: flex;">
+  <div id="plot" style="width:70%; height:500px;"></div>
+  <div style="width:30%; padding-left:20px;">
+    <h3>Used Data Columns</h3>
+<table id="dataPreviewTable" border="1" style="font-size:0.8em; width:100%; border-collapse:collapse; margin-top:1em;">
+  <thead><tr><th>Strain</th><th>Stress</th></tr></thead>
+  <tbody id="dataPreviewBody"></tbody>
+</table>
+    <table id="usedDataTable" border="1" style="font-size:0.9em; width:100%; border-collapse:collapse;">
+      <thead><tr><th>File</th><th>Strain Column</th><th>Stress Column</th></tr></thead>
+      <tbody id="usedDataBody"></tbody>
+    </table>
   </div>
+</div>
 
-  <div id="modulusSummary"></div>
-  <pre id="debug"></pre>
+  <h3>Debug Console</h3>
+  <pre id="debugLog" style="background:#eee; padding:1em; height:200px; overflow:auto;"></pre>
+
   <script src="app.js"></script>
 </body>
 </html>

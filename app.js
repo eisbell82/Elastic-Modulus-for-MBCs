@@ -1,145 +1,101 @@
-let pyodideReady = false;
+
 let pyodide = null;
 let currentModuli = [];
 
-async function initPyodide() {
-  pyodide = await loadPyodide();
-  await pyodide.loadPackage(['pandas', 'numpy', 'scikit-learn', 'scipy']);
-  await pyodide.runPythonAsync(await (await fetch("modulus.py")).text());
-  console.log("✅ Pyodide initialized. Ready.");
-  pyodideReady = true;
-}
-initPyodide();
-
 function log(msg) {
-  document.getElementById("debug").textContent += msg + "\n";
+  const out = document.getElementById("debugLog");
+  if (out) out.textContent += `\n${msg}`;
+  console.log(msg);
 }
 
 async function runAnalysis() {
-  if (!pyodideReady) {
-    log("⚠️ Pyodide not ready yet.");
-    return;
-  }
+  const input = document.getElementById("csvFile");
+  const minStrain = parseFloat(document.getElementById("strainMin").value);
+  const maxStrain = parseFloat(document.getElementById("strainMax").value);
+  const smoothWin = parseInt(document.getElementById("smoothingWindow").value);
+  const polyOrder = parseInt(document.getElementById("polyOrder").value);
+  if (!input.files.length) return alert("No CSVs selected.");
 
-  const input = document.getElementById("fileInput");
-  if (!input.files.length) {
-    log("⚠️ No files selected.");
-    return;
-  }
-
-  document.getElementById("debug").textContent = "";
-  const csv_texts = [];
-  const names = [];
-
-  for (const file of input.files) {
-    const text = await file.text();
-    csv_texts.push(text);
-    if (i === 0) renderCsvPreview(text);
-    names.push(file.name);
-
-
-
-
-// === CSV Preview rendering from scratch ===
-if (csv_texts.length > 0) {
-  const previewText = csv_texts[0];
-  const parsed = Papa.parse(previewText, { skipEmptyLines: true });
-  const rows = parsed.data;
-  if (rows.length < 3) {
-    document.getElementById("dataBody").innerHTML = "<tr><td colspan='2'>Too few rows for preview</td></tr>";
-    return;
-  }
-
-  const headerRow = rows[0].map(cell => cell.trim());
-  const unitRow = rows[1].map(cell => cell.trim());
-  const combinedHeaders = headerRow.map((label, i) => {
-    const unit = unitRow[i] || "";
-    return unit ? `${label} ${unit}` : label;
-  });
-
-  const strainIndex = combinedHeaders.findIndex(h => h.toLowerCase().includes("strain") && h.toLowerCase().includes("%"));
-  const stressIndex = combinedHeaders.findIndex(h => h.toLowerCase().includes("stress") && h.toLowerCase().includes("mpa"));
-
-  const tableBody = document.getElementById("dataBody");
-  tableBody.innerHTML = "";
-
-  if (strainIndex === -1 || stressIndex === -1) {
-    const row = document.createElement("tr");
-    row.innerHTML = "<td colspan='2'>Strain or stress column not found</td>";
-    tableBody.appendChild(row);
-    return;
-  }
-
-  const dataRows = rows.slice(2); // Skip headers
-  let shown = 0;
-  for (let i = 0; i < dataRows.length && shown < 20; i++) {
-    const row = dataRows[i];
-    const strainVal = parseFloat(row[strainIndex]);
-    const stressVal = parseFloat(row[stressIndex]);
-    if (!isNaN(strainVal) && !isNaN(stressVal)) {
-      const tr = document.createElement("tr");
-      const tdStrain = document.createElement("td");
-      const tdStress = document.createElement("td");
-      tdStrain.textContent = (strainVal / 100).toFixed(4);
-      tdStress.textContent = stressVal.toFixed(2);
-      tr.appendChild(tdStrain);
-      tr.appendChild(tdStress);
-      tableBody.appendChild(tr);
-      shown++;
+  try {
+    const csv_texts = [];
+    const names = [];
+    for (const file of input.files) {
+      const text = await file.text();
+      csv_texts.push(text);
+      names.push(file.name);
     }
-  }
 
-  if (shown === 0) {
-    const row = document.createElement("tr");
-    row.innerHTML = "<td colspan='2'>No valid numeric data found</td>";
+    pyodide.globals.set("js_csvs", csv_texts);
+    pyodide.globals.set("js_min", minStrain);
+    pyodide.globals.set("js_max", maxStrain);
+    pyodide.globals.set("js_window", smoothWin);
+    pyodide.globals.set("js_order", polyOrder);
+
+    log("Running Pyodide analysis...");
+    await pyodide.runPythonAsync("results = process_csv_all(js_csvs, js_min, js_max, js_window, js_order)");
+    const curves = pyodide.globals.get("results").toJs({ dict_converter: Object.fromEntries });
+
+    currentModuli = [];
+    const traces = [];
+    const tableBody = document.getElementById("usedDataBody");
+    tableBody.innerHTML = '';
+
+    curves.forEach((curve, i) => {
+      log(`\n[${i}] ${names[i]} → keys: ${Object.keys(curve).join(', ')}`);
+      log(`  strain_values: ${curve.strain_values?.length ?? "missing"}, stress_values: ${curve.stress_values?.length ?? "missing"}`);
+if (curve.strain_values) log(`  first strain: ${curve.strain_values[0]}`);
+if (curve.stress_values) log(`  first stress: ${curve.stress_values[0]}`);
+      const label = names[i];
+      traces.push({ x: curve.strain, y: curve.stress, name: `${label} raw`, mode: "lines", line: { dash: "dot" } });
+    const row = document.createElement('tr');
+    row.innerHTML = `<td>${label}</td><td>${curve.strain_column}</td><td>${curve.stress_column}</td>`;
     tableBody.appendChild(row);
-  }
-}
-
-
-// Safe preview renderer
-function renderCsvPreview(csvText) {
-  const parsed = Papa.parse(csvText, { skipEmptyLines: true });
-  const rows = parsed.data;
-  if (rows.length < 3) {
-    document.getElementById("dataBody").innerHTML = "<tr><td colspan='2'>Too few rows for preview</td></tr>";
-    return;
-  }
-
-  const headers = rows[0].map(cell => cell.trim());
-  const units = rows[1].map(cell => cell.trim());
-  const combinedHeaders = headers.map((label, i) => {
-    const unit = units[i] || "";
-    return unit ? `${label} ${unit}` : label;
-  });
-
-  const strainIndex = combinedHeaders.findIndex(h => h.toLowerCase().includes("strain") && h.toLowerCase().includes("%"));
-  const stressIndex = combinedHeaders.findIndex(h => h.toLowerCase().includes("stress") && h.toLowerCase().includes("mpa"));
-
-  const dataRows = rows.slice(2);
-  const tableBody = document.getElementById("dataBody");
-  tableBody.innerHTML = "";
-
-  if (strainIndex === -1 || stressIndex === -1) {
-    tableBody.innerHTML = "<tr><td colspan='2'>Strain or stress column not found</td></tr>";
-    return;
-  }
-
-  let shown = 0;
-  for (let i = 0; i < dataRows.length && shown < 20; i++) {
-    const row = dataRows[i];
-    const strainVal = parseFloat(row[strainIndex]);
-    const stressVal = parseFloat(row[stressIndex]);
-    if (!isNaN(strainVal) && !isNaN(stressVal)) {
-      const tr = document.createElement("tr");
-      tr.innerHTML = `<td>${(strainVal / 100).toFixed(4)}</td><td>${stressVal.toFixed(2)}</td>`;
-      tableBody.appendChild(tr);
-      shown++;
+    if (i === 0) {
+      const dataBody = document.getElementById('dataPreviewBody');
+      dataBody.innerHTML = '';
+      for (let j = 0; j < Math.min(curve.strain_values.length, curve.stress_values.length); j++) {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `<td>${curve.strain_values[j].toFixed(5)}</td><td>${curve.stress_values[j].toFixed(3)}</td>`;
+        dataBody.appendChild(tr);
+      }
     }
-  }
+      traces.push({ x: curve.strain, y: curve.smoothed, name: `${label} smoothed`, mode: "lines" });
+      if (curve.modulus !== null) {
+        if (typeof curve.modulus === "number" && typeof curve.r2 === "number") {
+        traces.push({ x: curve.fit_x, y: curve.fit_y, name: `${label} fit (${curve.modulus.toFixed(2)} MPa, R²=${curve.r2.toFixed(2)})`, mode: "lines", line: { dash: "dash" } });
+        currentModuli.push(curve.modulus);
+      } else {
+        log(`⚠️ ${label}: Not enough points in strain range for fit`);
+      }
+      } else {
+        log(`⚠️ ${label}: Not enough data in range for fitting`);
+      }
+    });
 
-  if (shown === 0) {
-    tableBody.innerHTML = "<tr><td colspan='2'>No valid numeric data</td></tr>";
+    document.getElementById("modulusDisplay").innerText =
+      currentModuli.length
+        ? `Avg Modulus: ${math.mean(currentModuli).toFixed(2)} ± ${math.std(currentModuli).toFixed(2)} MPa`
+        : "No valid fits.";
+
+    Plotly.newPlot("plot", traces, {
+      title: "Per-File Stress-Strain Curves",
+      xaxis: { title: "Strain" },
+      yaxis: { title: "Stress (MPa)" }
+    });
+
+  } catch (err) {
+    log("❌ Error during analysis. See JS console.");
+    console.error(err);
   }
 }
+
+async function initPyodide() {
+  pyodide = await loadPyodide();
+  await pyodide.loadPackage(["pandas", "scikit-learn"]);
+  const code = await (await fetch("modulus.py")).text();
+  await pyodide.runPythonAsync(code);
+  window.runAnalysis = runAnalysis;
+  log("✅ Pyodide initialized. Ready.");
 }
+
+initPyodide();
